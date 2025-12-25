@@ -1,6 +1,6 @@
 
-import React from 'react';
-import { SEOAuditReport } from '../types';
+import React, { useState, useMemo } from 'react';
+import { SEOAuditReport, CompetitorInsight } from '../types';
 import { MetricCard } from './MetricCard';
 import { 
   BarChart, 
@@ -13,7 +13,12 @@ import {
   TrendingUp, 
   ExternalLink,
   Target,
-  ListTodo
+  ListTodo,
+  Columns,
+  X,
+  Plus,
+  Minus,
+  ArrowUpDown
 } from 'lucide-react';
 import { 
   Radar, 
@@ -27,7 +32,15 @@ interface ReportViewProps {
   report: SEOAuditReport;
 }
 
+type SortKey = 'competitor' | 'advantage' | 'threat';
+type SortDirection = 'asc' | 'desc';
+
 export const ReportView: React.FC<ReportViewProps> = ({ report }) => {
+  const [competitorSearch, setCompetitorSearch] = useState('');
+  const [selectedCompetitors, setSelectedCompetitors] = useState<CompetitorInsight[]>([]);
+  const [sortKey, setSortKey] = useState<SortKey>('competitor');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+
   const radarData = [
     { subject: 'On-Page', A: report.categories.onPage.score },
     { subject: 'Technical', A: report.categories.technical.score },
@@ -35,6 +48,40 @@ export const ReportView: React.FC<ReportViewProps> = ({ report }) => {
     { subject: 'Authority', A: report.categories.authority.score },
     { subject: 'Indexing', A: report.categories.indexing.score },
   ];
+
+  const processedCompetitors = useMemo(() => {
+    return [...report.competitorInsights]
+      .filter(comp => 
+        comp.competitor.toLowerCase().includes(competitorSearch.toLowerCase())
+      )
+      .sort((a, b) => {
+        const valA = a[sortKey].toLowerCase();
+        const valB = b[sortKey].toLowerCase();
+        if (sortDirection === 'asc') {
+          return valA.localeCompare(valB);
+        } else {
+          return valB.localeCompare(valA);
+        }
+      });
+  }, [report.competitorInsights, competitorSearch, sortKey, sortDirection]);
+
+  const toggleCompetitorSelection = (comp: CompetitorInsight) => {
+    const isSelected = selectedCompetitors.some(c => c.competitor === comp.competitor);
+    if (isSelected) {
+      setSelectedCompetitors(selectedCompetitors.filter(c => c.competitor !== comp.competitor));
+    } else {
+      setSelectedCompetitors([...selectedCompetitors, comp]);
+    }
+  };
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(key);
+      setSortDirection('asc');
+    }
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
@@ -71,7 +118,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ report }) => {
                     fillOpacity={0.3}
                   />
                 </RadarChart>
-              </ResponsiveContainer>
+               </ResponsiveContainer>
             </div>
           </div>
         </div>
@@ -107,7 +154,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ report }) => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Action Plan */}
+        {/* Left Column: Action Plan & Findings */}
         <div className="lg:col-span-2 space-y-6">
           <section className="bg-white rounded-xl border border-slate-200 p-6">
             <div className="flex items-center gap-2 mb-6">
@@ -154,41 +201,162 @@ export const ReportView: React.FC<ReportViewProps> = ({ report }) => {
               ))}
             </div>
           </section>
+
+          {/* Section: Side-by-Side Comparison Matrix */}
+          {selectedCompetitors.length > 0 && (
+            <section className="bg-slate-900 rounded-2xl p-6 text-white shadow-2xl animate-in slide-in-from-bottom-4 duration-500">
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-indigo-500/20 text-indigo-400 rounded-lg">
+                    <Columns size={20} />
+                  </div>
+                  <h2 className="text-xl font-bold">Side-by-Side Comparison</h2>
+                </div>
+                <button 
+                  onClick={() => setSelectedCompetitors([])}
+                  className="text-slate-400 hover:text-white flex items-center gap-1 text-sm font-medium"
+                >
+                  <X size={16} /> Clear All
+                </button>
+              </div>
+
+              <div className="overflow-x-auto pb-4 custom-scrollbar">
+                <table className="w-full text-left border-collapse min-w-[600px]">
+                  <thead>
+                    <tr>
+                      <th className="pb-4 pt-2 border-b border-slate-800 text-slate-400 font-bold uppercase tracking-wider text-xs w-1/4">Metric</th>
+                      {selectedCompetitors.map((comp, idx) => (
+                        <th key={idx} className="pb-4 pt-2 px-4 border-b border-slate-800 text-indigo-400 font-black uppercase text-sm truncate">
+                          {comp.competitor}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="py-6 border-b border-slate-800 font-bold text-slate-300">Market Advantage</td>
+                      {selectedCompetitors.map((comp, idx) => (
+                        <td key={idx} className="py-6 px-4 border-b border-slate-800">
+                          <div className="bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-lg text-emerald-400 text-xs leading-relaxed">
+                            {comp.advantage}
+                          </div>
+                        </td>
+                      ))}
+                    </tr>
+                    <tr>
+                      <td className="py-6 border-b border-slate-800 font-bold text-slate-300">Strategic Threat</td>
+                      {selectedCompetitors.map((comp, idx) => (
+                        <td key={idx} className="py-6 px-4 border-b border-slate-800">
+                          <div className="bg-rose-500/10 border border-rose-500/20 p-3 rounded-lg text-rose-400 text-xs leading-relaxed">
+                            {comp.threat}
+                          </div>
+                        </td>
+                      ))}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
         </div>
 
-        {/* Competitor Insights & Sources */}
+        {/* Right Column: Competitor List & Sources */}
         <div className="space-y-8">
-          <section className="bg-white rounded-xl border border-slate-200 p-6">
-            <div className="flex items-center gap-2 mb-6">
-              <div className="p-2 bg-purple-50 text-purple-600 rounded-lg">
-                <Target size={20} />
-              </div>
-              <h2 className="text-xl font-bold text-slate-900">Market Intelligence</h2>
-            </div>
-            <div className="space-y-6">
-              {report.competitorInsights.map((comp, idx) => (
-                <div key={idx} className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-purple-500" />
-                    <span className="font-black text-slate-800">{comp.competitor}</span>
-                  </div>
-                  <div className="pl-3.5 space-y-2">
-                    <div className="text-xs">
-                      <span className="font-bold text-emerald-600 uppercase">Edge: </span>
-                      <span className="text-slate-600">{comp.advantage}</span>
-                    </div>
-                    <div className="text-xs">
-                      <span className="font-bold text-rose-500 uppercase">Threat: </span>
-                      <span className="text-slate-600">{comp.threat}</span>
-                    </div>
-                  </div>
+          <section className="bg-white rounded-xl border border-slate-200 p-6 flex flex-col h-full shadow-sm">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-purple-50 text-purple-600 rounded-lg">
+                  <Target size={20} />
                 </div>
+                <h2 className="text-xl font-bold text-slate-900">Market Intelligence</h2>
+              </div>
+            </div>
+
+            {/* Search Bar for Competitors */}
+            <div className="relative mb-4">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search size={14} className="text-slate-400" />
+              </div>
+              <input
+                type="text"
+                placeholder="Filter competitors..."
+                value={competitorSearch}
+                onChange={(e) => setCompetitorSearch(e.target.value)}
+                className="block w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+              />
+            </div>
+
+            {/* Sort Controls */}
+            <div className="flex items-center gap-1 mb-6 overflow-x-auto pb-1 custom-scrollbar">
+              <span className="text-[10px] font-black uppercase text-slate-400 mr-2 flex-shrink-0">Sort By:</span>
+              {(['competitor', 'advantage', 'threat'] as SortKey[]).map((key) => (
+                <button
+                  key={key}
+                  onClick={() => handleSort(key)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all border whitespace-nowrap ${
+                    sortKey === key 
+                      ? 'bg-indigo-600 text-white border-indigo-600' 
+                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  {key === 'competitor' ? 'Name' : key.charAt(0).toUpperCase() + key.slice(1)}
+                  {sortKey === key && (
+                    <ArrowUpDown size={12} className={`transition-transform duration-200 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} />
+                  )}
+                </button>
               ))}
             </div>
+
+            <div className="space-y-3 overflow-y-auto max-h-[600px] pr-2 custom-scrollbar">
+              {processedCompetitors.length > 0 ? (
+                processedCompetitors.map((comp, idx) => {
+                  const isSelected = selectedCompetitors.some(c => c.competitor === comp.competitor);
+                  return (
+                    <div 
+                      key={idx} 
+                      onClick={() => toggleCompetitorSelection(comp)}
+                      className={`group cursor-pointer p-4 rounded-xl border transition-all duration-200 ${
+                        isSelected 
+                          ? 'bg-indigo-50 border-indigo-200 shadow-sm ring-1 ring-indigo-200' 
+                          : 'bg-white border-slate-100 hover:border-slate-300 hover:shadow-sm'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2 h-2 rounded-full ${isSelected ? 'bg-indigo-600' : 'bg-slate-300 group-hover:bg-purple-400'}`} />
+                          <span className={`font-black text-sm uppercase tracking-tight ${isSelected ? 'text-indigo-900' : 'text-slate-800'}`}>
+                            {comp.competitor}
+                          </span>
+                        </div>
+                        <div className={`p-1 rounded-md transition-colors ${isSelected ? 'bg-indigo-600 text-white' : 'bg-slate-50 text-slate-400'}`}>
+                          {isSelected ? <Minus size={14} /> : <Plus size={14} />}
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed italic">
+                        "{comp.advantage.slice(0, 100)}..."
+                      </p>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-sm text-slate-500 italic">No competitors found</p>
+                </div>
+              )}
+            </div>
+            
+            {selectedCompetitors.length > 0 && (
+              <div className="mt-6 pt-4 border-t border-slate-100">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-400 uppercase tracking-widest">
+                  <span>Comparing</span>
+                  <span className="bg-indigo-600 text-white px-2 py-0.5 rounded-full">{selectedCompetitors.length}</span>
+                </div>
+              </div>
+            )}
           </section>
 
           {report.groundingSources && report.groundingSources.length > 0 && (
-            <section className="bg-slate-900 rounded-xl p-6 text-white">
+            <section className="bg-slate-900 rounded-xl p-6 text-white shadow-sm">
                <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-2">
                 <ExternalLink size={12} />
                 Verification Sources
@@ -210,6 +378,29 @@ export const ReportView: React.FC<ReportViewProps> = ({ report }) => {
           )}
         </div>
       </div>
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 4px;
+          height: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #cbd5e1;
+          border-radius: 10px;
+        }
+        .custom-scrollbar:hover::-webkit-scrollbar-thumb {
+          background: #94a3b8;
+        }
+        @keyframes slideInUp {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-in {
+          animation: slideInUp 0.4s ease-out forwards;
+        }
+      `}</style>
     </div>
   );
 };
